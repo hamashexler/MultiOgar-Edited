@@ -66,7 +66,7 @@ function GameServer() {
         serverStatsPort: 88, // Port for stats server. Having a negative number will disable the stats server.
         serverStatsUpdate: 60, // Update interval of server stats in seconds
         mobilePhysics: 0, // Whether or not the server uses mobile agar.io physics
-        badWordFilter: 1, // Toggle whether you want the bad word filter on (0 to disable, 1 to enable)
+        badWordFilter: 1, // Toggle whether you want the bad word filter on (0 to disable, 1 to enable) 
         serverRestart: 0, // Toggle whether you want your server to auto restart in minutes. (0 to disable)
 
         /** CLIENT **/
@@ -302,7 +302,7 @@ GameServer.prototype.onClientSocketOpen = function (ws, req) {
     ws.on('message', function (message) {
         if (self.config.serverWsModule === "uws")
             // uws gives ArrayBuffer - convert it to Buffer
-            message = parseInt(process.version[1]) < 6 ? Buffer.from(message) : Buffer.from(message);
+            message = parseInt(process.version[1]) < 6 ? new Buffer(message) : Buffer.from(message);
 
         if (!message.length) return;
         if (message.length > 256) {
@@ -528,11 +528,12 @@ GameServer.prototype.onChatMessage = function (from, to, message) {
 
 GameServer.prototype.checkBadWord = function (value) {
     if (!value) return false;
-    value = " " + value.toLowerCase().trim() + " ";
+    value = value.toLowerCase().trim();
+    if (!value) return false;
+    var split = value.split(" ");
     for (var i = 0; i < this.badWords.length; i++) {
-        if (value.indexOf(this.badWords[i]) >= 0) {
-            return true;
-        }
+        for (var j = 0; j < split.length; j++)
+            if (split[j] === this.badWords[i]) return true;
     }
     return false;
 };
@@ -543,7 +544,7 @@ GameServer.prototype.sendChatMessage = function (from, to, message) {
         if (!to || to == this.clients[i].playerTracker) {
             var Packet = require('./packet');
             if (this.config.separateChatForTeams && this.gameMode.haveTeams) {
-                //  from equals null if message from server
+                //  from equals null if message from server 
                 if (from == null || from.team === this.clients[i].playerTracker.team) {
                     this.clients[i].packetHandler.sendPacket(new Packet.ChatMessage(from, message));
                 }
@@ -584,21 +585,18 @@ GameServer.prototype.mainLoop = function () {
         this.run = true;
         this.lastNodeId = 1;
         this.lastPlayerId = 1;
+
         for (var i = 0; i < this.clients.length; i++) {
             var client = this.clients[i];
             client.close();
         };
-        this.nodes = [];
+
+        this.nodes = []; 
         this.nodesVirus = [];
-        this.nodesFood = [];
+        this.nodesFood = []; 
         this.nodesEjected = [];
         this.nodesPlayer = [];
         this.movingNodes = [];
-        if (this.config.serverBots) {
-            for (var i = 0; i < this.config.serverBots; i++)
-                this.bots.addBot();
-            Logger.info("Added " + this.config.serverBots + " player bots");
-        };
         this.commands;
         this.tickCounter = 0;
         this.startTime = Date.now();
@@ -1053,10 +1051,10 @@ GameServer.prototype.loadFiles = function () {
             var words = fs.readFileSync(fileNameBadWords, 'utf-8');
             words = words.split(/[\r\n]+/);
             words = words.map(function (arg) {
-                return " " + arg.trim().toLowerCase() + " "; // Formatting
+                return arg.trim().toLowerCase();
             });
             words = words.filter(function (arg) {
-                return arg.length > 2;
+                return !!arg;
             });
             this.badWords = words;
             Logger.info(this.badWords.length + " bad words loaded");
